@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Heatmap</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.0/heatmap.min.js"></script>
+</head>
+<body>
+  <div id="heatmap" style="width: 800px; height: 600px;"></div>
+  <script>
+    fetch('http://yourapp-xyz123.app.digitalocean.com/data?page=' + encodeURIComponent(window.prompt('Enter page URL')) + '&platform=' + prompt('Enter platform (clickfunnels or shopify)'))
+      .then(res => res.json())
+      .then(data => {
+        const heatmap = h337.create({ container: document.getElementById('heatmap') });
+        heatmap.setData({ max: 10, data: data });
+      });
+  </script>
+</body>
+</html>
