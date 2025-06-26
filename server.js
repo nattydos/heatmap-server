@@ -45,3 +45,13 @@ app.get('/data', (req, res) => {
 });
 
 app.listen(process.env.PORT || 8080, () => console.log('Server running on port', process.env.PORT || 8080));
+
+app.get('/debug', (req, res) => {
+  db.all('SELECT * FROM interactions', (err, rows) => {
+    if (err) {
+      console.error('Debug query error:', err);
+      return res.sendStatus(500);
+    }
+    res.json(rows);
+  });
+});
