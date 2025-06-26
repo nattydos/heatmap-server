@@ -35,49 +35,61 @@ app.get('/data', (req, res) => {
 
   const stats = { overall: {}, nonClickers: {}, clickers: {} };
 
-  // Overall stats (all sections, including unknown)
-  db.each('SELECT section, AVG(duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) as median_duration FROM interactions WHERE page = ? AND platform = ? AND duration > 0 GROUP BY section', 
+  // Overall stats (all sections with duration > 0)
+  db.all('SELECT section, AVG(duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) as median_duration FROM interactions WHERE page = ? AND platform = ? AND duration > 0 GROUP BY section', 
     [page, platform], 
-    (err, row) => {
+    (err, rows) => {
       if (err) {
         console.error('Overall stats query error:', err);
         return res.sendStatus(500);
       }
-      if (row.section) stats.overall[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
-    }, 
-    () => {
-      // Non-clickers (no click events for this page/platform)
-      db.each(`
+      rows.forEach(row => {
+        if (row.section) stats.overall[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
+      });
+
+      // Non-clickers (no click events within a 5-minute window of any scroll)
+      db.all(`
         SELECT i.section, AVG(i.duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY i.duration) as median_duration 
         FROM interactions i 
-        WHERE i.page = ? AND i.platform = ? AND i.duration > 0 
-        AND NOT EXISTS (SELECT 1 FROM interactions c WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click')
+        WHERE i.page = ? AND i.platform = ? AND i.duration > 0 AND i.type = 'scroll'
+        AND NOT EXISTS (
+          SELECT 1 FROM interactions c 
+          WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click'
+          AND ABS(UNIXEPoch(c.timestamp) - UNIXEPoch(i.timestamp)) < 300 -- 5 minutes in seconds
+        )
         GROUP BY i.section`, 
         [page, platform], 
-        (err, row) => {
+        (err, rows) => {
           if (err) {
             console.error('Non-clickers stats query error:', err);
             return res.sendStatus(500);
           }
-          if (row.section) stats.nonClickers[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
-        }, 
-        () => {
-          // Clickers (at least one click event for this page/platform)
-          db.each(`
+          rows.forEach(row => {
+            if (row.section) stats.nonClickers[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
+          });
+
+          // Clickers (at least one click within a 5-minute window of any scroll)
+          db.all(`
             SELECT i.section, AVG(i.duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY i.duration) as median_duration 
             FROM interactions i 
-            WHERE i.page = ? AND i.platform = ? AND i.duration > 0 
-            AND EXISTS (SELECT 1 FROM interactions c WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click')
+            WHERE i.page = ? AND i.platform = ? AND i.duration > 0 AND i.type = 'scroll'
+            AND EXISTS (
+              SELECT 1 FROM interactions c 
+              WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click'
+              AND ABS(UNIXEPoch(c.timestamp) - UNIXEPoch(i.timestamp)) < 300 -- 5 minutes in seconds
+            )
             GROUP BY i.section`, 
             [page, platform], 
-            (err, row) => {
+            (err, rows) => {
               if (err) {
                 console.error('Clickers stats query error:', err);
                 return res.sendStatus(500);
               }
-              if (row.section) stats.clickers[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
-            }, 
-            () => res.json(stats));
+              rows.forEach(row => {
+                if (row.section) stats.clickers[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
+              });
+              res.json(stats);
+            });
         });
     });
 });
