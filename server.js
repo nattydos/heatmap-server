@@ -11,20 +11,21 @@ const db = new sqlite3.Database('heatmap.db', (err) => {
   if (err) console.error('Database connection error:', err);
 });
 
-db.run('CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCREMENT, x INTEGER, y INTEGER, page TEXT, platform TEXT, type TEXT, section TEXT, duration REAL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)', (err) => {
+// Ensure the interactions table includes sessionId
+db.run('CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCREMENT, sessionId TEXT, x INTEGER, y INTEGER, page TEXT, platform TEXT, type TEXT, section TEXT, duration REAL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)', (err) => {
   if (err) console.error('Table creation error:', err);
 });
 
 app.post('/track', (req, res) => {
-  const { x, y, page, platform, type, section, duration } = req.body;
-  db.run('INSERT INTO interactions (x, y, page, platform, type, section, duration) VALUES (?, ?, ?, ?, ?, ?, ?)', 
-    [x, y, page, platform, type, section || null, duration || null], 
+  const { sessionId, x, y, page, platform, type, section, duration } = req.body;
+  db.run('INSERT INTO interactions (sessionId, x, y, page, platform, type, section, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
+    [sessionId, x, y, page, platform, type, section || null, duration || null], 
     (err) => {
       if (err) {
         console.error('Insert error:', err);
         return res.sendStatus(500);
       }
-      console.log('Data inserted:', { x, y, page, platform, type, section, duration });
+      console.log('Data inserted:', { sessionId, x, y, page, platform, type, section, duration });
       res.sendStatus(200);
     });
 });
@@ -41,21 +42,23 @@ app.get('/data', (req, res) => {
         return res.sendStatus(500);
       }
 
-      // Separate scroll and click events
+      // Group interactions by sessionId
+      const sessions = allInteractions.reduce((acc, i) => {
+        if (!acc[i.sessionId]) acc[i.sessionId] = [];
+        acc[i.sessionId].push(i);
+        return acc;
+      }, {});
+
+      // Identify clicker sessions (sessions with at least one click event)
+      const clickerSessions = Object.values(sessions).filter(session => session.some(i => i.type === 'click'));
+      const nonClickerSessions = Object.values(sessions).filter(session => !session.some(i => i.type === 'click'));
+
+      // Extract scroll events for overall, clickers, and nonClickers
       const scrollEvents = allInteractions.filter(i => i.type === 'scroll');
-      const clickEvents = allInteractions.filter(i => i.type === 'click')
-        .map(c => new Date(c.timestamp).getTime() / 1000); // Convert to Unix seconds
+      const clickerScrolls = clickerSessions.flatMap(session => session.filter(i => i.type === 'scroll'));
+      const nonClickerScrolls = nonClickerSessions.flatMap(session => session.filter(i => i.type === 'scroll'));
 
-      // Function to determine if a scroll event is associated with a clicker
-      function isClicker(scroll) {
-        const scrollTime = new Date(scroll.timestamp).getTime() / 1000;
-        return clickEvents.some(clickTime => Math.abs(clickTime - scrollTime) < 300); // 5-minute window
-      }
-
-      const clickerScrolls = scrollEvents.filter(isClicker);
-      const nonClickerScrolls = scrollEvents.filter(s => !isClicker(s));
-
-      // Function to calculate average and median for a set of events
+      // Function to calculate average and median for a set of scroll events
       function calculateStats(events) {
         const grouped = events.reduce((acc, e) => {
           acc[e.section] = acc[e.section] || [];
