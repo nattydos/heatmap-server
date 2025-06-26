@@ -30,7 +30,7 @@
       .then(res => res.json())
       .then(data => {
         const tableBody = document.getElementById('statsTable');
-        const sections = ['hero', 'middle', 'bottom'];
+        const sections = ['hero', 'middle', 'bottom', 'unknown']; // Include all possible sections
         sections.forEach(section => {
           const row = document.createElement('tr');
           row.innerHTML = `
