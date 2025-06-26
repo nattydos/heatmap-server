@@ -1,20 +1,49 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Heatmap</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.0/heatmap.min.js"></script>
+  <title>Section Time Analytics</title>
+  <style>
+    table { border-collapse: collapse; width: 80%; margin: 20px auto; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background-color: #f2f2f2; }
+  </style>
 </head>
 <body>
-  <div id="heatmap" style="width: 800px; height: 600px; border: 1px solid #ccc;"></div>
+  <table>
+    <thead>
+      <tr>
+        <th>Section</th>
+        <th>Overall Avg (s)</th>
+        <th>Overall Median (s)</th>
+        <th>Non-Clickers Avg (s)</th>
+        <th>Non-Clickers Median (s)</th>
+        <th>Clickers Avg (s)</th>
+        <th>Clickers Median (s)</th>
+      </tr>
+    </thead>
+    <tbody id="statsTable"></tbody>
+  </table>
   <script>
     const url = prompt('Enter page URL');
     const platform = prompt('Enter platform (clickfunnels or shopify)');
     fetch(`https://heatmap4dos-yf3zi.ondigitalocean.app/data?page=${encodeURIComponent(url)}&platform=${platform}`)
       .then(res => res.json())
       .then(data => {
-        console.log('Fetched data:', data);
-        const heatmap = h337.create({ container: document.getElementById('heatmap'), max: 100 });
-        heatmap.setData({ max: 100, data: data.filter(d => d.value > 0) });
+        const tableBody = document.getElementById('statsTable');
+        const sections = ['hero', 'middle', 'bottom'];
+        sections.forEach(section => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${section}</td>
+            <td>${(data.overall[section]?.avg || 0).toFixed(2)}</td>
+            <td>${(data.overall[section]?.median || 0).toFixed(2)}</td>
+            <td>${(data.nonClickers[section]?.avg || 0).toFixed(2)}</td>
+            <td>${(data.nonClickers[section]?.median || 0).toFixed(2)}</td>
+            <td>${(data.clickers[section]?.avg || 0).toFixed(2)}</td>
+            <td>${(data.clickers[section]?.median || 0).toFixed(2)}</td>
+          `;
+          tableBody.appendChild(row);
+        });
       })
       .catch(err => console.error('Fetch error:', err));
   </script>
