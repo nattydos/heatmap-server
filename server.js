@@ -24,27 +24,66 @@ app.post('/track', (req, res) => {
         console.error('Insert error:', err);
         return res.sendStatus(500);
       }
+      console.log('Data inserted:', { x, y, page, platform, type, section, duration });
       res.sendStatus(200);
     });
 });
 
 app.get('/data', (req, res) => {
   const { page, platform } = req.query;
-  db.all('SELECT x, y, type, section, duration FROM interactions WHERE page = ? AND platform = ?', [page, platform], (err, rows) => {
-    if (err) {
-      console.error('Query error:', err);
-      return res.sendStatus(500);
-    }
-    const data = rows.map(row => ({
-      x: row.x,
-      y: row.y,
-      value: row.type === 'scroll' ? (row.duration || 0) * 10 : 1 // Scale scroll duration for heatmap
-    }));
-    res.json(data);
-  });
-});
+  if (!page || !platform) return res.status(400).json({ error: 'Page and platform are required' });
 
-app.listen(process.env.PORT || 8080, () => console.log('Server running on port', process.env.PORT || 8080));
+  // Overall stats
+  const overallStats = {};
+  db.each('SELECT section, AVG(duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) as median_duration FROM interactions WHERE page = ? AND platform = ? AND duration IS NOT NULL GROUP BY section', 
+    [page, platform], 
+    (err, row) => {
+      if (err) {
+        console.error('Overall stats query error:', err);
+        return res.sendStatus(500);
+      }
+      if (row.section) overallStats[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
+    }, 
+    () => {
+      // Non-clickers (users with no click events)
+      const nonClickersStats = {};
+      db.each(`
+        SELECT section, AVG(duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) as median_duration 
+        FROM interactions 
+        WHERE page = ? AND platform = ? AND duration IS NOT NULL 
+        AND id NOT IN (SELECT id FROM interactions WHERE type = 'click')
+        GROUP BY section`, 
+        [page, platform], 
+        (err, row) => {
+          if (err) {
+            console.error('Non-clickers stats query error:', err);
+            return res.sendStatus(500);
+          }
+          if (row.section) nonClickersStats[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
+        }, 
+        () => {
+          // Clickers (users with at least one click event)
+          const clickersStats = {};
+          db.each(`
+            SELECT section, AVG(duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) as median_duration 
+            FROM interactions 
+            WHERE page = ? AND platform = ? AND duration IS NOT NULL 
+            AND id IN (SELECT id FROM interactions WHERE type = 'click')
+            GROUP BY section`, 
+            [page, platform], 
+            (err, row) => {
+              if (err) {
+                console.error('Clickers stats query error:', err);
+                return res.sendStatus(500);
+              }
+              if (row.section) clickersStats[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
+            }, 
+            () => {
+              res.json({ overall: overallStats, nonClickers: nonClickersStats, clickers: clickersStats });
+            });
+        });
+    });
+});
 
 app.get('/debug', (req, res) => {
   db.all('SELECT * FROM interactions', (err, rows) => {
@@ -55,3 +94,5 @@ app.get('/debug', (req, res) => {
     res.json(rows);
   });
 });
+
+app.listen(process.env.PORT || 8080, () => console.log('Server running on port', process.env.PORT || 8080));
