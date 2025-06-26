@@ -9,9 +9,10 @@
   <script>
     const url = prompt('Enter page URL');
     const platform = prompt('Enter platform (clickfunnels or shopify)');
-    fetch(`https://yourapp-xyz123.app.digitalocean.com/data?page=${encodeURIComponent(url)}&platform=${platform}`)
+    fetch(`https://heatmap4dos-yf3zi.ondigitalocean.app/data?page=${encodeURIComponent(url)}&platform=${platform}`)
       .then(res => res.json())
       .then(data => {
+        console.log('Fetched data:', data);
         const heatmap = h337.create({ container: document.getElementById('heatmap'), max: 100 });
         heatmap.setData({ max: 100, data: data.filter(d => d.value > 0) });
       })
