@@ -7,21 +7,40 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-const db = new sqlite3.Database('heatmap.db');
-db.run('CREATE TABLE IF NOT EXISTS clicks (x INTEGER, y INTEGER, page TEXT, platform TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)');
+const db = new sqlite3.Database('heatmap.db', (err) => {
+  if (err) console.error('Database connection error:', err);
+});
+
+db.run('CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCREMENT, x INTEGER, y INTEGER, page TEXT, platform TEXT, type TEXT, section TEXT, duration REAL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)', (err) => {
+  if (err) console.error('Table creation error:', err);
+});
 
 app.post('/track', (req, res) => {
-  const { x, y, page, platform } = req.body;
-  db.run('INSERT INTO clicks (x, y, page, platform) VALUES (?, ?, ?, ?)', [x, y, page, platform], (err) => {
-    if (err) console.error(err);
-    res.sendStatus(200);
-  });
+  const { x, y, page, platform, type, section, duration } = req.body;
+  db.run('INSERT INTO interactions (x, y, page, platform, type, section, duration) VALUES (?, ?, ?, ?, ?, ?, ?)', 
+    [x, y, page, platform, type, section || null, duration || null], 
+    (err) => {
+      if (err) {
+        console.error('Insert error:', err);
+        return res.sendStatus(500);
+      }
+      res.sendStatus(200);
+    });
 });
 
 app.get('/data', (req, res) => {
-  db.all('SELECT x, y FROM clicks WHERE page = ? AND platform = ?', [req.query.page, req.query.platform], (err, rows) => {
-    if (err) console.error(err);
-    res.json(rows.map(row => ({ x: row.x, y: row.y, value: 1 })));
+  const { page, platform } = req.query;
+  db.all('SELECT x, y, type, section, duration FROM interactions WHERE page = ? AND platform = ?', [page, platform], (err, rows) => {
+    if (err) {
+      console.error('Query error:', err);
+      return res.sendStatus(500);
+    }
+    const data = rows.map(row => ({
+      x: row.x,
+      y: row.y,
+      value: row.type === 'scroll' ? (row.duration || 0) * 10 : 1 // Scale scroll duration for heatmap
+    }));
+    res.json(data);
   });
 });
 
