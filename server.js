@@ -55,7 +55,7 @@ app.get('/data', (req, res) => {
         AND NOT EXISTS (
           SELECT 1 FROM interactions c 
           WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click'
-          AND ABS(UNIXEPoch(c.timestamp) - UNIXEPoch(i.timestamp)) < 300 -- 5 minutes in seconds
+          AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300 -- 5 minutes in seconds
         )
         GROUP BY i.section`, 
         [page, platform], 
@@ -76,7 +76,7 @@ app.get('/data', (req, res) => {
             AND EXISTS (
               SELECT 1 FROM interactions c 
               WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click'
-              AND ABS(UNIXEPoch(c.timestamp) - UNIXEPoch(i.timestamp)) < 300 -- 5 minutes in seconds
+              AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300 -- 5 minutes in seconds
             )
             GROUP BY i.section`, 
             [page, platform], 
