@@ -36,8 +36,14 @@ app.get('/data', (req, res) => {
   const stats = { overall: {}, nonClickers: {}, clickers: {} };
 
   // Overall stats (all sections with duration > 0)
-  db.all('SELECT section, AVG(duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) as median_duration FROM interactions WHERE page = ? AND platform = ? AND duration > 0 GROUP BY section', 
-    [page, platform], 
+  db.all(`
+    SELECT section, 
+           AVG(duration) as avg_duration, 
+           (SELECT duration FROM interactions WHERE page = ? AND platform = ? AND duration > 0 AND section = i.section ORDER BY duration LIMIT 1 OFFSET (SELECT COUNT(*) FROM interactions WHERE page = ? AND platform = ? AND duration > 0 AND section = i.section) / 2) as median_duration
+    FROM interactions i 
+    WHERE i.page = ? AND i.platform = ? AND i.duration > 0 
+    GROUP BY i.section`, 
+    [page, platform, page, platform, page, platform], 
     (err, rows) => {
       if (err) {
         console.error('Overall stats query error:', err);
@@ -49,16 +55,24 @@ app.get('/data', (req, res) => {
 
       // Non-clickers (no click events within a 5-minute window of any scroll)
       db.all(`
-        SELECT i.section, AVG(i.duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY i.duration) as median_duration 
+        SELECT i.section, 
+               AVG(i.duration) as avg_duration, 
+               (SELECT duration FROM interactions WHERE page = ? AND platform = ? AND duration > 0 AND section = i.section AND NOT EXISTS (
+                 SELECT 1 FROM interactions c WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click' 
+                 AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300
+               ) ORDER BY duration LIMIT 1 OFFSET (SELECT COUNT(*) FROM interactions WHERE page = ? AND platform = ? AND duration > 0 AND section = i.section AND NOT EXISTS (
+                 SELECT 1 FROM interactions c WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click' 
+                 AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300
+               )) / 2) as median_duration
         FROM interactions i 
         WHERE i.page = ? AND i.platform = ? AND i.duration > 0 AND i.type = 'scroll'
         AND NOT EXISTS (
           SELECT 1 FROM interactions c 
           WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click'
-          AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300 -- 5 minutes in seconds
+          AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300
         )
         GROUP BY i.section`, 
-        [page, platform], 
+        [page, platform, page, platform, page, platform], 
         (err, rows) => {
           if (err) {
             console.error('Non-clickers stats query error:', err);
@@ -70,16 +84,24 @@ app.get('/data', (req, res) => {
 
           // Clickers (at least one click within a 5-minute window of any scroll)
           db.all(`
-            SELECT i.section, AVG(i.duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY i.duration) as median_duration 
+            SELECT i.section, 
+                   AVG(i.duration) as avg_duration, 
+                   (SELECT duration FROM interactions WHERE page = ? AND platform = ? AND duration > 0 AND section = i.section AND EXISTS (
+                     SELECT 1 FROM interactions c WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click' 
+                     AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300
+                   ) ORDER BY duration LIMIT 1 OFFSET (SELECT COUNT(*) FROM interactions WHERE page = ? AND platform = ? AND duration > 0 AND section = i.section AND EXISTS (
+                     SELECT 1 FROM interactions c WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click' 
+                     AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300
+                   )) / 2) as median_duration
             FROM interactions i 
             WHERE i.page = ? AND i.platform = ? AND i.duration > 0 AND i.type = 'scroll'
             AND EXISTS (
               SELECT 1 FROM interactions c 
               WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click'
-              AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300 -- 5 minutes in seconds
+              AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300
             )
             GROUP BY i.section`, 
-            [page, platform], 
+            [page, platform, page, platform, page, platform], 
             (err, rows) => {
               if (err) {
                 console.error('Clickers stats query error:', err);
