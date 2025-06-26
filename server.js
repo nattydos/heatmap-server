@@ -33,86 +33,59 @@ app.get('/data', (req, res) => {
   const { page, platform } = req.query;
   if (!page || !platform) return res.status(400).json({ error: 'Page and platform are required' });
 
-  const stats = { overall: {}, nonClickers: {}, clickers: {} };
-
-  // Overall stats (all sections with duration > 0)
-  db.all(`
-    SELECT i.section, 
-           AVG(i.duration) as avg_duration, 
-           (SELECT duration FROM interactions WHERE page = ? AND platform = ? AND duration > 0 AND section = i.section ORDER BY duration LIMIT 1 OFFSET (SELECT (COUNT(*) + 1) / 2 - 1 FROM interactions WHERE page = ? AND platform = ? AND duration > 0 AND section = i.section)) as median_duration
-    FROM interactions i 
-    WHERE i.page = ? AND i.platform = ? AND i.duration > 0 
-    GROUP BY i.section`, 
-    [page, platform, page, platform, page, platform], 
-    (err, rows) => {
+  db.all('SELECT * FROM interactions WHERE page = ? AND platform = ? AND ((type = "scroll" AND duration > 0) OR type = "click")', 
+    [page, platform], 
+    (err, allInteractions) => {
       if (err) {
-        console.error('Overall stats query error:', err);
+        console.error('Database query error:', err);
         return res.sendStatus(500);
       }
-      rows.forEach(row => {
-        if (row.section) stats.overall[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
+
+      // Separate scroll and click events
+      const scrollEvents = allInteractions.filter(i => i.type === 'scroll');
+      const clickEvents = allInteractions.filter(i => i.type === 'click')
+        .map(c => new Date(c.timestamp).getTime() / 1000); // Convert to Unix seconds
+
+      // Function to determine if a scroll event is associated with a clicker
+      function isClicker(scroll) {
+        const scrollTime = new Date(scroll.timestamp).getTime() / 1000;
+        return clickEvents.some(clickTime => Math.abs(clickTime - scrollTime) < 300); // 5-minute window
+      }
+
+      const clickerScrolls = scrollEvents.filter(isClicker);
+      const nonClickerScrolls = scrollEvents.filter(s => !isClicker(s));
+
+      // Function to calculate average and median for a set of events
+      function calculateStats(events) {
+        const grouped = events.reduce((acc, e) => {
+          acc[e.section] = acc[e.section] || [];
+          acc[e.section].push(e.duration);
+          return acc;
+        }, {});
+
+        const stats = {};
+        for (const section in grouped) {
+          const durations = grouped[section].sort((a, b) => a - b);
+          const n = durations.length;
+          if (n === 0) continue; // Skip empty sections
+          const median = n % 2 === 1 ? durations[Math.floor(n / 2)] : (durations[n / 2 - 1] + durations[n / 2]) / 2;
+          const avg = durations.reduce((sum, d) => sum + d, 0) / n;
+          stats[section] = { avg, median };
+        }
+        return stats;
+      }
+
+      // Calculate stats for all categories
+      const overallStats = calculateStats(scrollEvents);
+      const nonClickerStats = calculateStats(nonClickerScrolls);
+      const clickerStats = calculateStats(clickerScrolls);
+
+      // Send response
+      res.json({
+        overall: overallStats,
+        nonClickers: nonClickerStats,
+        clickers: clickerStats
       });
-
-      // Non-clickers (no click events within a 5-minute window of any scroll)
-      db.all(`
-        SELECT i.section, 
-               AVG(i.duration) as avg_duration, 
-               (SELECT duration FROM interactions WHERE page = ? AND platform = ? AND duration > 0 AND section = i.section AND NOT EXISTS (
-                 SELECT 1 FROM interactions c WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click' 
-                 AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300
-               ) ORDER BY duration LIMIT 1 OFFSET (SELECT (COUNT(*) + 1) / 2 - 1 FROM interactions WHERE page = ? AND platform = ? AND duration > 0 AND section = i.section AND NOT EXISTS (
-                 SELECT 1 FROM interactions c WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click' 
-                 AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300
-               ))) as median_duration
-        FROM interactions i 
-        WHERE i.page = ? AND i.platform = ? AND i.duration > 0 AND i.type = 'scroll'
-        AND NOT EXISTS (
-          SELECT 1 FROM interactions c 
-          WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click'
-          AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300
-        )
-        GROUP BY i.section`, 
-        [page, platform, page, platform, page, platform], 
-        (err, rows) => {
-          if (err) {
-            console.error('Non-clickers stats query error:', err);
-            return res.sendStatus(500);
-          }
-          rows.forEach(row => {
-            if (row.section) stats.nonClickers[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
-          });
-
-          // Clickers (at least one click within a 5-minute window of any scroll)
-          db.all(`
-            SELECT i.section, 
-                   AVG(i.duration) as avg_duration, 
-                   (SELECT duration FROM interactions WHERE page = ? AND platform = ? AND duration > 0 AND section = i.section AND EXISTS (
-                     SELECT 1 FROM interactions c WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click' 
-                     AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300
-                   ) ORDER BY duration LIMIT 1 OFFSET (SELECT (COUNT(*) + 1) / 2 - 1 FROM interactions WHERE page = ? AND platform = ? AND duration > 0 AND section = i.section AND EXISTS (
-                     SELECT 1 FROM interactions c WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click' 
-                     AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300
-                   ))) as median_duration
-            FROM interactions i 
-            WHERE i.page = ? AND i.platform = ? AND i.duration > 0 AND i.type = 'scroll'
-            AND EXISTS (
-              SELECT 1 FROM interactions c 
-              WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click'
-              AND ABS(strftime('%s', c.timestamp) - strftime('%s', i.timestamp)) < 300
-            )
-            GROUP BY i.section`, 
-            [page, platform, page, platform, page, platform], 
-            (err, rows) => {
-              if (err) {
-                console.error('Clickers stats query error:', err);
-                return res.sendStatus(500);
-              }
-              rows.forEach(row => {
-                if (row.section) stats.clickers[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
-              });
-              res.json(stats);
-            });
-        });
     });
 });
 
