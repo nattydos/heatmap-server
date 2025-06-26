@@ -33,54 +33,51 @@ app.get('/data', (req, res) => {
   const { page, platform } = req.query;
   if (!page || !platform) return res.status(400).json({ error: 'Page and platform are required' });
 
-  // Overall stats
-  const overallStats = {};
-  db.each('SELECT section, AVG(duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) as median_duration FROM interactions WHERE page = ? AND platform = ? AND duration IS NOT NULL GROUP BY section', 
+  const stats = { overall: {}, nonClickers: {}, clickers: {} };
+
+  // Overall stats (all sections, including unknown)
+  db.each('SELECT section, AVG(duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) as median_duration FROM interactions WHERE page = ? AND platform = ? AND duration > 0 GROUP BY section', 
     [page, platform], 
     (err, row) => {
       if (err) {
         console.error('Overall stats query error:', err);
         return res.sendStatus(500);
       }
-      if (row.section) overallStats[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
+      if (row.section) stats.overall[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
     }, 
     () => {
-      // Non-clickers (users with no click events)
-      const nonClickersStats = {};
+      // Non-clickers (no click events for this page/platform)
       db.each(`
-        SELECT section, AVG(duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) as median_duration 
-        FROM interactions 
-        WHERE page = ? AND platform = ? AND duration IS NOT NULL 
-        AND id NOT IN (SELECT id FROM interactions WHERE type = 'click')
-        GROUP BY section`, 
+        SELECT i.section, AVG(i.duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY i.duration) as median_duration 
+        FROM interactions i 
+        WHERE i.page = ? AND i.platform = ? AND i.duration > 0 
+        AND NOT EXISTS (SELECT 1 FROM interactions c WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click')
+        GROUP BY i.section`, 
         [page, platform], 
         (err, row) => {
           if (err) {
             console.error('Non-clickers stats query error:', err);
             return res.sendStatus(500);
           }
-          if (row.section) nonClickersStats[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
+          if (row.section) stats.nonClickers[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
         }, 
         () => {
-          // Clickers (users with at least one click event)
-          const clickersStats = {};
+          // Clickers (at least one click event for this page/platform)
           db.each(`
-            SELECT section, AVG(duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) as median_duration 
-            FROM interactions 
-            WHERE page = ? AND platform = ? AND duration IS NOT NULL 
-            AND id IN (SELECT id FROM interactions WHERE type = 'click')
-            GROUP BY section`, 
+            SELECT i.section, AVG(i.duration) as avg_duration, percentile_cont(0.5) WITHIN GROUP (ORDER BY i.duration) as median_duration 
+            FROM interactions i 
+            WHERE i.page = ? AND i.platform = ? AND i.duration > 0 
+            AND EXISTS (SELECT 1 FROM interactions c WHERE c.page = i.page AND c.platform = i.platform AND c.type = 'click')
+            GROUP BY i.section`, 
             [page, platform], 
             (err, row) => {
               if (err) {
                 console.error('Clickers stats query error:', err);
                 return res.sendStatus(500);
               }
-              if (row.section) clickersStats[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
+              if (row.section) stats.clickers[row.section] = { avg: row.avg_duration || 0, median: row.median_duration || 0 };
             }, 
-            () => {
-              res.json({ overall: overallStats, nonClickers: nonClickersStats, clickers: clickersStats });
-            });
+            () => res.json(stats));
         });
     });
 });
