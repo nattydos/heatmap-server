@@ -5,14 +5,17 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.0/heatmap.min.js"></script>
 </head>
 <body>
-  <div id="heatmap" style="width: 800px; height: 600px;"></div>
+  <div id="heatmap" style="width: 800px; height: 600px; border: 1px solid #ccc;"></div>
   <script>
-    fetch('http://yourapp-xyz123.app.digitalocean.com/data?page=' + encodeURIComponent(window.prompt('Enter page URL')) + '&platform=' + prompt('Enter platform (clickfunnels or shopify)'))
+    const url = prompt('Enter page URL');
+    const platform = prompt('Enter platform (clickfunnels or shopify)');
+    fetch(`https://yourapp-xyz123.app.digitalocean.com/data?page=${encodeURIComponent(url)}&platform=${platform}`)
       .then(res => res.json())
       .then(data => {
-        const heatmap = h337.create({ container: document.getElementById('heatmap') });
-        heatmap.setData({ max: 10, data: data });
-      });
+        const heatmap = h337.create({ container: document.getElementById('heatmap'), max: 100 });
+        heatmap.setData({ max: 100, data: data.filter(d => d.value > 0) });
+      })
+      .catch(err => console.error('Fetch error:', err));
   </script>
 </body>
 </html>
