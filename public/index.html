@@ -88,31 +88,58 @@
       }));
     }
 
-    // Click tracking with enhanced debug and unload handling
-    document.addEventListener('click', (e) => {
-      console.log('Click detected! Target:', e.target, 'Tag:', e.target.tagName, 'Phase:', e.eventPhase, 'Propagation stopped:', e.isPropagationStopped());
-      let target = e.target.tagName.toLowerCase();
-      if (!['a', 'button'].includes(target)) {
-        const actionable = e.target.closest('a, button');
-        target = actionable ? actionable.tagName.toLowerCase() : target;
-      }
-      console.log('Processed target:', target);
-      const clickData = {
-        sessionId: sessionId,
-        x: e.clientX,
-        y: e.clientY,
-        page: window.location.href,
-        platform: 'clickfunnels',
-        type: 'click',
-        section: null,
-        duration: null,
-        target: target
-      };
-      clickQueue.push(clickData); // Queue the click
-    }, { capture: true });
+    // Mutation observer to detect and attach listeners to links
+    const observer = new MutationObserver((mutations) => {
+      document.querySelectorAll('a[href], button').forEach(element => {
+        if (!element.dataset.tracked) {
+          element.addEventListener('click', (e) => {
+            console.log('Link click detected! Target:', e.target, 'Tag:', e.target.tagName, 'Phase:', e.eventPhase);
+            let target = e.target.tagName.toLowerCase();
+            const clickData = {
+              sessionId: sessionId,
+              x: e.clientX,
+              y: e.clientY,
+              page: window.location.href,
+              platform: 'clickfunnels',
+              type: 'click',
+              section: null,
+              duration: null,
+              target: target
+            };
+            clickQueue.push(clickData);
+          }, { capture: true, once: true });
+          element.dataset.tracked = 'true';
+        }
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
 
-    // Send queued clicks on unload
-    window.addEventListener('unload', sendQueuedClicks);
+    // Fallback: Log navigation on unload
+    window.addEventListener('unload', () => {
+      console.log('Page unloading, sending queued clicks');
+      sendQueuedClicks();
+      // Fallback: Log a click if no prior clicks and navigation occurred
+      if (clickQueue.length === 0 && performance.navigation.type === 1) { // TYPE_RELOAD = 1, but we infer navigation
+        const lastClick = { x: window.innerWidth / 2, y: window.innerHeight / 2 }; // Approximate
+        const clickData = {
+          sessionId: sessionId,
+          x: lastClick.x,
+          y: lastClick.y,
+          page: window.location.href,
+          platform: 'clickfunnels',
+          type: 'click',
+          section: null,
+          duration: null,
+          target: 'a' // Assume link
+        };
+        fetch('/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(clickData),
+          keepalive: true
+        });
+      }
+    });
 
     // Scroll tracking
     document.addEventListener('scroll', (e) => {
