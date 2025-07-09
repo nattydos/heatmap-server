@@ -17,17 +17,16 @@ db.run('CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCR
 });
 
 app.post('/track', (req, res) => {
-  const { sessionId, x, y, page, platform, type, section, duration } = req.body;
-  // Only log click if x, y coordinates suggest intentional interaction (e.g., within typical content area)
-  const isValidClick = type === 'click' && x >= 0 && x <= 1920 && y >= 0 && y <= 1080;
+  const { sessionId, x, y, page, platform, type, section, duration, target } = req.body;
+  const isValidClick = type === 'click' && target && (target.includes('a') || target.includes('button'));
   db.run('INSERT INTO interactions (sessionId, x, y, page, platform, type, section, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
-    [sessionId, x, y, page, platform, type === 'click' && !isValidClick ? null : type, section || null, duration || null], 
+    [sessionId, x, y, page, platform, isValidClick ? type : (type === 'click' ? null : type), section || null, duration || null], 
     (err) => {
       if (err) {
         console.error('Insert error:', err);
         return res.sendStatus(500);
       }
-      console.log('Data inserted:', { sessionId, x, y, page, platform, type, section, duration });
+      console.log('Data inserted:', { sessionId, x, y, page, platform, type, section, duration, target });
       res.sendStatus(200);
     });
 });
