@@ -77,9 +77,14 @@
     script.setAttribute('data-session-id', sessionId);
     document.head.appendChild(script);
 
-    // Click tracking
+    // Click tracking with enhanced target detection
     document.addEventListener('click', (e) => {
-      const target = e.target.tagName.toLowerCase();
+      let target = e.target.tagName.toLowerCase();
+      if (!['a', 'button'].includes(target)) {
+        const actionable = e.target.closest('a, button');
+        target = actionable ? actionable.tagName.toLowerCase() : target;
+      }
+      console.log('Click target:', target); // Debug log
       fetch('/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
