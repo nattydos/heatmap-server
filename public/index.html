@@ -77,30 +77,42 @@
     script.setAttribute('data-session-id', sessionId);
     document.head.appendChild(script);
 
-    // Click tracking with enhanced target detection
+    // Queue for click events to send on unload
+    const clickQueue = [];
+    function sendQueuedClicks() {
+      clickQueue.forEach(click => fetch('/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(click),
+        keepalive: true // Ensure send on unload
+      }));
+    }
+
+    // Click tracking with enhanced debug and unload handling
     document.addEventListener('click', (e) => {
+      console.log('Click detected! Target:', e.target, 'Tag:', e.target.tagName, 'Phase:', e.eventPhase, 'Propagation stopped:', e.isPropagationStopped());
       let target = e.target.tagName.toLowerCase();
       if (!['a', 'button'].includes(target)) {
         const actionable = e.target.closest('a, button');
         target = actionable ? actionable.tagName.toLowerCase() : target;
       }
-      console.log('Click target:', target); // Debug log
-      fetch('/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: sessionId,
-          x: e.clientX,
-          y: e.clientY,
-          page: window.location.href,
-          platform: 'clickfunnels',
-          type: 'click',
-          section: null,
-          duration: null,
-          target: target
-        })
-      });
-    });
+      console.log('Processed target:', target);
+      const clickData = {
+        sessionId: sessionId,
+        x: e.clientX,
+        y: e.clientY,
+        page: window.location.href,
+        platform: 'clickfunnels',
+        type: 'click',
+        section: null,
+        duration: null,
+        target: target
+      };
+      clickQueue.push(clickData); // Queue the click
+    }, { capture: true });
+
+    // Send queued clicks on unload
+    window.addEventListener('unload', sendQueuedClicks);
 
     // Scroll tracking
     document.addEventListener('scroll', (e) => {
