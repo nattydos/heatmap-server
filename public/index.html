@@ -37,7 +37,7 @@
       <td>${(data.overall.bottom?.avg || 0).toFixed(2)}</td>
       <td>${(data.overall.bottom?.median || 0).toFixed(2)}</td>
       <td>${(data.nonClickers.bottom?.avg || 0).toFixed(2)} ${(data.nonClickers.bottom || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
-      <td>${(data.nonClickers.bottom?.median || 0).toFixed(2)} ${(data.nonClickers.bottom || Object.keys(data.nonClickers).length === 0) ? '(Possible click misclassification)' : ''}</td>
+      <td>${(data.nonClickers.bottom?.median || 0).toFixed(2)} ${(data.nonClickers.bottom || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
       <td>${(data.clickers.bottom?.avg || 0).toFixed(2)}</td>
       <td>${(data.clickers.bottom?.median || 0).toFixed(2)}</td>
     </tr>
@@ -52,6 +52,71 @@
     </tr>
   </table>
   <script>
+    // Track clicks and scrolls
+    let lastScrollTime = null;
+    function getCurrentSection() {
+      const sections = document.querySelectorAll('section');
+      for (let section of sections) {
+        const rect = section.getBoundingClientRect();
+        if (rect.top >= 0 && rect.top < window.innerHeight) {
+          return section.id || 'unknown';
+        }
+      }
+      return 'unknown';
+    }
+    function calculateScrollDuration() {
+      const now = Date.now();
+      const duration = lastScrollTime ? (now - lastScrollTime) / 1000 : 0;
+      lastScrollTime = now;
+      return duration;
+    }
+
+    // Initialize session ID
+    const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2);
+    const script = document.createElement('script');
+    script.setAttribute('data-session-id', sessionId);
+    document.head.appendChild(script);
+
+    // Click tracking
+    document.addEventListener('click', (e) => {
+      const target = e.target.tagName.toLowerCase();
+      fetch('/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sessionId,
+          x: e.clientX,
+          y: e.clientY,
+          page: window.location.href,
+          platform: 'clickfunnels',
+          type: 'click',
+          section: null,
+          duration: null,
+          target: target
+        })
+      });
+    });
+
+    // Scroll tracking
+    document.addEventListener('scroll', (e) => {
+      const section = getCurrentSection();
+      fetch('/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sessionId,
+          x: window.innerWidth / 2,
+          y: window.scrollY + window.innerHeight / 2,
+          page: window.location.href,
+          platform: 'clickfunnels',
+          type: 'scroll',
+          section: section,
+          duration: calculateScrollDuration()
+        })
+      });
+    });
+
+    // Fetch and display data
     fetch('/data?page=https://shopping.naturaldos.com/calmblend-microdose-advert-lp1&platform=clickfunnels')
       .then(response => response.json())
       .then(data => {
