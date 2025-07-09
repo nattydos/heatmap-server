@@ -1,51 +1,63 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Section Time Analytics</title>
-  <style>
-    table { border-collapse: collapse; width: 80%; margin: 20px auto; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-    th { background-color: #f2f2f2; }
-  </style>
+  <title>Heatmap Data</title>
 </head>
 <body>
-  <table>
-    <thead>
-      <tr>
-        <th>Section</th>
-        <th>Overall Avg (s)</th>
-        <th>Overall Median (s)</th>
-        <th>Non-Clickers Avg (s)</th>
-        <th>Non-Clickers Median (s)</th>
-        <th>Clickers Avg (s)</th>
-        <th>Clickers Median (s)</th>
-      </tr>
-    </thead>
-    <tbody id="statsTable"></tbody>
+  <table border="1">
+    <tr>
+      <th>Section</th>
+      <th>Overall Avg (s)</th>
+      <th>Overall Median (s)</th>
+      <th>Non-Clickers Avg (s)</th>
+      <th>Non-Clickers Median (s)</th>
+      <th>Clickers Avg (s)</th>
+      <th>Clickers Median (s)</th>
+    </tr>
+    <tr>
+      <td>hero</td>
+      <td>${(data.overall.hero?.avg || 0).toFixed(2)}</td>
+      <td>${(data.overall.hero?.median || 0).toFixed(2)}</td>
+      <td>${(data.nonClickers.hero?.avg || 0).toFixed(2)} ${(data.nonClickers.hero || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
+      <td>${(data.nonClickers.hero?.median || 0).toFixed(2)} ${(data.nonClickers.hero || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
+      <td>${(data.clickers.hero?.avg || 0).toFixed(2)}</td>
+      <td>${(data.clickers.hero?.median || 0).toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td>middle</td>
+      <td>${(data.overall.middle?.avg || 0).toFixed(2)}</td>
+      <td>${(data.overall.middle?.median || 0).toFixed(2)}</td>
+      <td>${(data.nonClickers.middle?.avg || 0).toFixed(2)} ${(data.nonClickers.middle || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
+      <td>${(data.nonClickers.middle?.median || 0).toFixed(2)} ${(data.nonClickers.middle || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
+      <td>${(data.clickers.middle?.avg || 0).toFixed(2)}</td>
+      <td>${(data.clickers.middle?.median || 0).toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td>bottom</td>
+      <td>${(data.overall.bottom?.avg || 0).toFixed(2)}</td>
+      <td>${(data.overall.bottom?.median || 0).toFixed(2)}</td>
+      <td>${(data.nonClickers.bottom?.avg || 0).toFixed(2)} ${(data.nonClickers.bottom || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
+      <td>${(data.nonClickers.bottom?.median || 0).toFixed(2)} ${(data.nonClickers.bottom || Object.keys(data.nonClickers).length === 0) ? '(Possible click misclassification)' : ''}</td>
+      <td>${(data.clickers.bottom?.avg || 0).toFixed(2)}</td>
+      <td>${(data.clickers.bottom?.median || 0).toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td>unknown</td>
+      <td>${(data.overall.unknown?.avg || 0).toFixed(2)}</td>
+      <td>${(data.overall.unknown?.median || 0).toFixed(2)}</td>
+      <td>${(data.nonClickers.unknown?.avg || 0).toFixed(2)} ${(data.nonClickers.unknown || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
+      <td>${(data.nonClickers.unknown?.median || 0).toFixed(2)} ${(data.nonClickers.unknown || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
+      <td>${(data.clickers.unknown?.avg || 0).toFixed(2)}</td>
+      <td>${(data.clickers.unknown?.median || 0).toFixed(2)}</td>
+    </tr>
   </table>
   <script>
-    const url = prompt('Enter page URL');
-    const platform = prompt('Enter platform (clickfunnels or shopify)');
-    fetch(`https://heatmap4dos-yf3zi.ondigitalocean.app/data?page=${encodeURIComponent(url)}&platform=${platform}`)
-      .then(res => res.json())
+    fetch('/data?page=https://shopping.naturaldos.com/calmblend-microdose-advert-lp1&platform=clickfunnels')
+      .then(response => response.json())
       .then(data => {
-        const tableBody = document.getElementById('statsTable');
-        const sections = ['hero', 'middle', 'bottom', 'unknown']; // Include all possible sections
-        sections.forEach(section => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${section}</td>
-            <td>${(data.overall[section]?.avg || 0).toFixed(2)}</td>
-            <td>${(data.overall[section]?.median || 0).toFixed(2)}</td>
-            <td>${(data.nonClickers[section]?.avg || 0).toFixed(2)}</td>
-            <td>${(data.nonClickers[section]?.median || 0).toFixed(2)}</td>
-            <td>${(data.clickers[section]?.avg || 0).toFixed(2)}</td>
-            <td>${(data.clickers[section]?.median || 0).toFixed(2)}</td>
-          `;
-          tableBody.appendChild(row);
-        });
+        document.body.innerHTML = document.body.innerHTML.replace(/\${(.*?)}/g, (_, expr) => eval(expr));
       })
-      .catch(err => console.error('Fetch error:', err));
+      .catch(error => console.error('Error fetching data:', error));
   </script>
 </body>
 </html>
