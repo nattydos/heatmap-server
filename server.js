@@ -18,8 +18,10 @@ db.run('CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCR
 
 app.post('/track', (req, res) => {
   const { sessionId, x, y, page, platform, type, section, duration } = req.body;
+  // Only log click if x, y coordinates suggest intentional interaction (e.g., within typical content area)
+  const isValidClick = type === 'click' && x >= 0 && x <= 1920 && y >= 0 && y <= 1080;
   db.run('INSERT INTO interactions (sessionId, x, y, page, platform, type, section, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
-    [sessionId, x, y, page, platform, type, section || null, duration || null], 
+    [sessionId, x, y, page, platform, type === 'click' && !isValidClick ? null : type, section || null, duration || null], 
     (err) => {
       if (err) {
         console.error('Insert error:', err);
@@ -49,9 +51,15 @@ app.get('/data', (req, res) => {
         return acc;
       }, {});
 
-      // Identify clicker sessions (sessions with at least one click event)
-      const clickerSessions = Object.values(sessions).filter(session => session.some(i => i.type === 'click'));
-      const nonClickerSessions = Object.values(sessions).filter(session => !session.some(i => i.type === 'click'));
+      // Identify clicker sessions (sessions with at least one valid click event)
+      const clickerSessions = Object.values(sessions).filter(session => session.some(i => i.type === 'click' && i.type !== null));
+      const nonClickerSessions = Object.values(sessions).filter(session => !session.some(i => i.type === 'click' && i.type !== null));
+
+      // Log session classification for debugging
+      Object.keys(sessions).forEach(sessionId => {
+        const hasClick = sessions[sessionId].some(i => i.type === 'click' && i.type !== null);
+        console.log(`Session ${sessionId} classified as ${hasClick ? 'clicker' : 'non-clicker'}`);
+      });
 
       // Extract scroll events for overall, clickers, and nonClickers
       const scrollEvents = allInteractions.filter(i => i.type === 'scroll');
