@@ -4,6 +4,21 @@
   <title>Heatmap Data</title>
 </head>
 <body>
+  <form id="config-form">
+    <label for="page">Page URL:</label>
+    <input type="text" id="page" name="page" value="https://shopping.naturaldos.com/advtr-hemp-softgel-news--5e333" required>
+    <label for="platform">Platform:</label>
+    <select id="platform" name="platform" required>
+      <option value="clickfunnels">ClickFunnels</option>
+      <option value="shopify">Shopify</option>
+    </select>
+    <button type="submit">Update Data</button>
+  </form>
+  <div id="stats">
+    <p>Total Sessions: <span id="total-sessions">0</span></p>
+    <p>Clicker Sessions: <span id="clicker-sessions">0</span></p>
+    <p>Total Clicks: <span id="total-clicks">0</span></p>
+  </div>
   <table border="1" id="heatmap-table">
     <tr>
       <th>Section</th>
@@ -16,39 +31,39 @@
     </tr>
     <tr>
       <td>hero</td>
-      <td id="overall-hero-avg">${(data.overall.hero?.avg || 0).toFixed(2)}</td>
-      <td id="overall-hero-med">${(data.overall.hero?.median || 0).toFixed(2)}</td>
-      <td id="nonclickers-hero-avg">${(data.nonClickers.hero?.avg || 0).toFixed(2)} ${(data.nonClickers.hero || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
-      <td id="nonclickers-hero-med">${(data.nonClickers.hero?.median || 0).toFixed(2)} ${(data.nonClickers.hero || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
-      <td id="clickers-hero-avg">${(data.clickers.hero?.avg || 0).toFixed(2)}</td>
-      <td id="clickers-hero-med">${(data.clickers.hero?.median || 0).toFixed(2)}</td>
+      <td id="overall-hero-avg">0.00</td>
+      <td id="overall-hero-med">0.00</td>
+      <td id="nonclickers-hero-avg">0.00</td>
+      <td id="nonclickers-hero-med">0.00</td>
+      <td id="clickers-hero-avg">0.00</td>
+      <td id="clickers-hero-med">0.00</td>
     </tr>
     <tr>
       <td>middle</td>
-      <td id="overall-middle-avg">${(data.overall.middle?.avg || 0).toFixed(2)}</td>
-      <td id="overall-middle-med">${(data.overall.middle?.median || 0).toFixed(2)}</td>
-      <td id="nonclickers-middle-avg">${(data.nonClickers.middle?.avg || 0).toFixed(2)} ${(data.nonClickers.middle || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
-      <td id="nonclickers-middle-med">${(data.nonClickers.middle?.median || 0).toFixed(2)} ${(data.nonClickers.middle || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
-      <td id="clickers-middle-avg">${(data.clickers.middle?.avg || 0).toFixed(2)}</td>
-      <td id="clickers-middle-med">${(data.clickers.middle?.median || 0).toFixed(2)}</td>
+      <td id="overall-middle-avg">0.00</td>
+      <td id="overall-middle-med">0.00</td>
+      <td id="nonclickers-middle-avg">0.00</td>
+      <td id="nonclickers-middle-med">0.00</td>
+      <td id="clickers-middle-avg">0.00</td>
+      <td id="clickers-middle-med">0.00</td>
     </tr>
     <tr>
       <td>bottom</td>
-      <td id="overall-bottom-avg">${(data.overall.bottom?.avg || 0).toFixed(2)}</td>
-      <td id="overall-bottom-med">${(data.overall.bottom?.median || 0).toFixed(2)}</td>
-      <td id="nonclickers-bottom-avg">${(data.nonClickers.bottom?.avg || 0).toFixed(2)} ${(data.nonClickers.bottom || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
-      <td id="nonclickers-bottom-med">${(data.nonClickers.bottom?.median || 0).toFixed(2)} ${(data.nonClickers.bottom || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
-      <td id="clickers-bottom-avg">${(data.clickers.bottom?.avg || 0).toFixed(2)}</td>
-      <td id="clickers-bottom-med">${(data.clickers.bottom?.median || 0).toFixed(2)}</td>
+      <td id="overall-bottom-avg">0.00</td>
+      <td id="overall-bottom-med">0.00</td>
+      <td id="nonclickers-bottom-avg">0.00</td>
+      <td id="nonclickers-bottom-med">0.00</td>
+      <td id="clickers-bottom-avg">0.00</td>
+      <td id="clickers-bottom-med">0.00</td>
     </tr>
     <tr>
       <td>unknown</td>
-      <td id="overall-unknown-avg">${(data.overall.unknown?.avg || 0).toFixed(2)}</td>
-      <td id="overall-unknown-med">${(data.overall.unknown?.median || 0).toFixed(2)}</td>
-      <td id="nonclickers-unknown-avg">${(data.nonClickers.unknown?.avg || 0).toFixed(2)} ${(data.nonClickers.unknown || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
-      <td id="nonclickers-unknown-med">${(data.nonClickers.unknown?.median || 0).toFixed(2)} ${(data.nonClickers.unknown || Object.keys(data.nonClickers).length === 0) ? '' : '(Possible click misclassification)'}</td>
-      <td id="clickers-unknown-avg">${(data.clickers.unknown?.avg || 0).toFixed(2)}</td>
-      <td id="clickers-unknown-med">${(data.clickers.unknown?.median || 0).toFixed(2)}</td>
+      <td id="overall-unknown-avg">0.00</td>
+      <td id="overall-unknown-med">0.00</td>
+      <td id="nonclickers-unknown-avg">0.00</td>
+      <td id="nonclickers-unknown-med">0.00</td>
+      <td id="clickers-unknown-avg">0.00</td>
+      <td id="clickers-unknown-med">0.00</td>
     </tr>
   </table>
   <div id="error-message" style="color: red; display: none;">Error loading data. Please check server or network.</div>
@@ -64,7 +79,7 @@
           return section.id || 'unknown';
         }
       }
-      return 'unknown'; // Default to 'unknown' if no section is found
+      return 'unknown';
     }
     function calculateScrollDuration() {
       const now = Date.now();
@@ -91,7 +106,7 @@
         const target = document.body;
         if (!target || !(target instanceof Node)) {
           console.error('Cannot set up observer: document.body is invalid', target);
-          setTimeout(setupObserver, 500); // Retry after 500ms
+          setTimeout(setupObserver, 500);
           return;
         }
         const observer = new MutationObserver((mutations) => {
@@ -120,7 +135,6 @@
                   body: JSON.stringify(clickData),
                   keepalive: true
                 }).then(() => console.log('Click data sent:', clickData));
-                // Delay navigation to ensure logging
                 setTimeout(() => {
                   if (e.currentTarget.href) window.location = e.currentTarget.href;
                 }, 100);
@@ -134,7 +148,6 @@
         console.log('Observer successfully set up on document.body');
       }
 
-      // Initialize observer when DOM is ready with retry
       if (document.readyState === 'complete' || document.readyState === 'interactive') {
         setupObserver();
       } else {
@@ -212,43 +225,55 @@
       console.log('Script running in iframe, skipping tracking setup');
     }
 
-    // Fetch and display data with error handling
-    fetch('/data?page=https://shopping.naturaldos.com/advtr-hemp-softgel-news--5e333&platform=clickfunnels')
-      .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
-        return response.json();
-      })
-      .then(data => {
-        const table = document.getElementById('heatmap-table');
-        table.querySelector('#overall-hero-avg').textContent = (data.overall.hero?.avg || 0).toFixed(2);
-        table.querySelector('#overall-hero-med').textContent = (data.overall.hero?.median || 0).toFixed(2);
-        table.querySelector('#nonclickers-hero-avg').textContent = (data.nonClickers.hero?.avg || 0).toFixed(2) + (data.nonClickers.hero || Object.keys(data.nonClickers).length === 0 ? '' : ' (Possible click misclassification)');
-        table.querySelector('#nonclickers-hero-med').textContent = (data.nonClickers.hero?.median || 0).toFixed(2) + (data.nonClickers.hero || Object.keys(data.nonClickers).length === 0 ? '' : ' (Possible click misclassification)');
-        table.querySelector('#clickers-hero-avg').textContent = (data.clickers.hero?.avg || 0).toFixed(2);
-        table.querySelector('#clickers-hero-med').textContent = (data.clickers.hero?.median || 0).toFixed(2);
-        table.querySelector('#overall-middle-avg').textContent = (data.overall.middle?.avg || 0).toFixed(2);
-        table.querySelector('#overall-middle-med').textContent = (data.overall.middle?.median || 0).toFixed(2);
-        table.querySelector('#nonclickers-middle-avg').textContent = (data.nonClickers.middle?.avg || 0).toFixed(2) + (data.nonClickers.middle || Object.keys(data.nonClickers).length === 0 ? '' : ' (Possible click misclassification)');
-        table.querySelector('#nonclickers-middle-med').textContent = (data.nonClickers.middle?.median || 0).toFixed(2) + (data.nonClickers.middle || Object.keys(data.nonClickers).length === 0 ? '' : ' (Possible click misclassification)');
-        table.querySelector('#clickers-middle-avg').textContent = (data.clickers.middle?.avg || 0).toFixed(2);
-        table.querySelector('#clickers-middle-med').textContent = (data.clickers.middle?.median || 0).toFixed(2);
-        table.querySelector('#overall-bottom-avg').textContent = (data.overall.bottom?.avg || 0).toFixed(2);
-        table.querySelector('#overall-bottom-med').textContent = (data.overall.bottom?.median || 0).toFixed(2);
-        table.querySelector('#nonclickers-bottom-avg').textContent = (data.nonClickers.bottom?.avg || 0).toFixed(2) + (data.nonClickers.bottom || Object.keys(data.nonClickers).length === 0 ? '' : ' (Possible click misclassification)');
-        table.querySelector('#nonclickers-bottom-med').textContent = (data.nonClickers.bottom?.median || 0).toFixed(2) + (data.nonClickers.bottom || Object.keys(data.nonClickers).length === 0 ? '' : ' (Possible click misclassification)');
-        table.querySelector('#clickers-bottom-avg').textContent = (data.clickers.bottom?.avg || 0).toFixed(2);
-        table.querySelector('#clickers-bottom-med').textContent = (data.clickers.bottom?.median || 0).toFixed(2);
-        table.querySelector('#overall-unknown-avg').textContent = (data.overall.unknown?.avg || 0).toFixed(2);
-        table.querySelector('#overall-unknown-med').textContent = (data.overall.unknown?.median || 0).toFixed(2);
-        table.querySelector('#nonclickers-unknown-avg').textContent = (data.nonClickers.unknown?.avg || 0).toFixed(2) + (data.nonClickers.unknown || Object.keys(data.nonClickers).length === 0 ? '' : ' (Possible click misclassification)');
-        table.querySelector('#nonclickers-unknown-med').textContent = (data.nonClickers.unknown?.median || 0).toFixed(2) + (data.nonClickers.unknown || Object.keys(data.nonClickers).length === 0 ? '' : ' (Possible click misclassification)');
-        table.querySelector('#clickers-unknown-avg').textContent = (data.clickers.unknown?.avg || 0).toFixed(2);
-        table.querySelector('#clickers-unknown-med').textContent = (data.clickers.unknown?.median || 0).toFixed(2);
-      })
-      .catch(error => {
-        console.error('Fetch error:', error);
-        document.getElementById('error-message').style.display = 'block';
-      });
+    // Fetch and display data with form handling
+    const form = document.getElementById('config-form');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const page = document.getElementById('page').value;
+      const platform = document.getElementById('platform').value;
+      fetch(`/data?page=${encodeURIComponent(page)}&platform=${encodeURIComponent(platform)}`)
+        .then(response => {
+          if (!response.ok) throw new Error('Network response was not ok');
+          return response.json();
+        })
+        .then(data => {
+          document.getElementById('total-sessions').textContent = data.totalSessions || 0;
+          document.getElementById('clicker-sessions').textContent = data.clickerSessions || 0;
+          document.getElementById('total-clicks').textContent = data.totalClicks || 0;
+          const table = document.getElementById('heatmap-table');
+          table.querySelector('#overall-hero-avg').textContent = (data.overall.hero?.avg || 0).toFixed(2);
+          table.querySelector('#overall-hero-med').textContent = (data.overall.hero?.median || 0).toFixed(2);
+          table.querySelector('#nonclickers-hero-avg').textContent = (data.nonClickers.hero?.avg || 0).toFixed(2);
+          table.querySelector('#nonclickers-hero-med').textContent = (data.nonClickers.hero?.median || 0).toFixed(2);
+          table.querySelector('#clickers-hero-avg').textContent = (data.clickers.hero?.avg || 0).toFixed(2);
+          table.querySelector('#clickers-hero-med').textContent = (data.clickers.hero?.median || 0).toFixed(2);
+          table.querySelector('#overall-middle-avg').textContent = (data.overall.middle?.avg || 0).toFixed(2);
+          table.querySelector('#overall-middle-med').textContent = (data.overall.middle?.median || 0).toFixed(2);
+          table.querySelector('#nonclickers-middle-avg').textContent = (data.nonClickers.middle?.avg || 0).toFixed(2);
+          table.querySelector('#nonclickers-middle-med').textContent = (data.nonClickers.middle?.median || 0).toFixed(2);
+          table.querySelector('#clickers-middle-avg').textContent = (data.clickers.middle?.avg || 0).toFixed(2);
+          table.querySelector('#clickers-middle-med').textContent = (data.clickers.middle?.median || 0).toFixed(2);
+          table.querySelector('#overall-bottom-avg').textContent = (data.overall.bottom?.avg || 0).toFixed(2);
+          table.querySelector('#overall-bottom-med').textContent = (data.overall.bottom?.median || 0).toFixed(2);
+          table.querySelector('#nonclickers-bottom-avg').textContent = (data.nonClickers.bottom?.avg || 0).toFixed(2);
+          table.querySelector('#nonclickers-bottom-med').textContent = (data.nonClickers.bottom?.median || 0).toFixed(2);
+          table.querySelector('#clickers-bottom-avg').textContent = (data.clickers.bottom?.avg || 0).toFixed(2);
+          table.querySelector('#clickers-bottom-med').textContent = (data.clickers.bottom?.median || 0).toFixed(2);
+          table.querySelector('#overall-unknown-avg').textContent = (data.overall.unknown?.avg || 0).toFixed(2);
+          table.querySelector('#overall-unknown-med').textContent = (data.overall.unknown?.median || 0).toFixed(2);
+          table.querySelector('#nonclickers-unknown-avg').textContent = (data.nonClickers.unknown?.avg || 0).toFixed(2);
+          table.querySelector('#nonclickers-unknown-med').textContent = (data.nonClickers.unknown?.median || 0).toFixed(2);
+          table.querySelector('#clickers-unknown-avg').textContent = (data.clickers.unknown?.avg || 0).toFixed(2);
+          table.querySelector('#clickers-unknown-med').textContent = (data.clickers.unknown?.median || 0).toFixed(2);
+        })
+        .catch(error => {
+          console.error('Fetch error:', error);
+          document.getElementById('error-message').style.display = 'block';
+        });
+    });
+
+    // Initial load
+    form.dispatchEvent(new Event('submit'));
   </script>
 </body>
 </html>
