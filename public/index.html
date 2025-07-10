@@ -68,8 +68,8 @@
   </table>
   <div id="error-message" style="color: red; display: none;">Error loading data. Please check server or network.</div>
   <script>
-    // Track clicks and scrolls
-    let lastScrollTime = null;
+    // Initialize lastScrollTime to ensure positive duration for first scroll
+    let lastScrollTime = Date.now();
     let lastClickPosition = { x: 0, y: 0 };
     function getCurrentSection() {
       const sections = document.querySelectorAll('section');
@@ -83,7 +83,7 @@
     }
     function calculateScrollDuration() {
       const now = Date.now();
-      const duration = lastScrollTime ? (now - lastScrollTime) / 1000 : 0;
+      const duration = (now - lastScrollTime) / 1000;
       lastScrollTime = now;
       return duration;
     }
@@ -189,22 +189,23 @@
         }
       }, { capture: true });
 
-      // Scroll tracking
+      // Scroll tracking with keepalive
       document.addEventListener('scroll', () => {
-        const section = getCurrentSection();
+        const payload = {
+          sessionId: sessionId,
+          x: window.innerWidth / 2,
+          y: window.scrollY + window.innerHeight / 2,
+          page: window.location.href,
+          platform: 'clickfunnels',
+          type: 'scroll',
+          section: getCurrentSection(),
+          duration: calculateScrollDuration()
+        };
         fetch('/track', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: sessionId,
-            x: window.innerWidth / 2,
-            y: window.scrollY + window.innerHeight / 2,
-            page: window.location.href,
-            platform: 'clickfunnels',
-            type: 'scroll',
-            section: section,
-            duration: calculateScrollDuration()
-          })
+          body: JSON.stringify(payload),
+          keepalive: true
         });
       });
 
