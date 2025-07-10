@@ -89,37 +89,60 @@
       }));
     }
 
-    // Mutation observer to detect and attach listeners to links
-    const observer = new MutationObserver((mutations) => {
-      document.querySelectorAll('a[href], button').forEach(element => {
-        if (!element.dataset.tracked) {
-          element.addEventListener('click', (e) => {
-            console.log('Link click detected! Target:', e.target, 'Tag:', e.target.tagName, 'Phase:', e.eventPhase);
-            let target = e.target.tagName.toLowerCase();
-            lastClickPosition = { x: e.clientX, y: e.clientY };
-            const clickData = {
-              sessionId: sessionId,
-              x: e.clientX,
-              y: e.clientY,
-              page: window.location.href,
-              platform: 'clickfunnels',
-              type: 'click',
-              section: null,
-              duration: null,
-              target: target
-            };
-            clickQueue.push(clickData);
-            // Delay navigation to ensure logging
-            setTimeout(() => {
-              if (e.target.href) window.location = e.target.href; // Mimic original navigation
-            }, 100); // 100ms delay
-            e.preventDefault(); // Prevent immediate navigation
-          }, { capture: true, once: true });
-          element.dataset.tracked = 'true';
-        }
+    // Mutation observer with iframe handling
+    function setupObserver(target) {
+      if (!target || !(target instanceof Node)) {
+        console.error('Invalid observer target:', target);
+        return;
+      }
+      const observer = new MutationObserver((mutations) => {
+        console.log('Mutation observed, checking links');
+        target.querySelectorAll('a[href], button').forEach(element => {
+          if (!element.dataset.tracked) {
+            element.addEventListener('click', (e) => {
+              console.log('Link click detected! Target:', e.target, 'Tag:', e.target.tagName, 'Phase:', e.eventPhase);
+              let target = e.target.tagName.toLowerCase();
+              lastClickPosition = { x: e.clientX, y: e.clientY };
+              const clickData = {
+                sessionId: sessionId,
+                x: e.clientX,
+                y: e.clientY,
+                page: window.location.href,
+                platform: 'clickfunnels',
+                type: 'click',
+                section: null,
+                duration: null,
+                target: target
+              };
+              clickQueue.push(clickData);
+              // Delay navigation to ensure logging
+              setTimeout(() => {
+                if (e.target.href) window.location = e.target.href; // Mimic original navigation
+              }, 100); // 100ms delay
+              e.preventDefault(); // Prevent immediate navigation
+            }, { capture: true, once: true });
+            element.dataset.tracked = 'true';
+          }
+        });
       });
+      observer.observe(target, { childList: true, subtree: true, attributes: true });
+      console.log('Observer set up on:', target);
+    }
+
+    // Set up observer on document body and check iframes
+    console.log('Setting up observer, document.body:', document.body);
+    setupObserver(document.body);
+    document.querySelectorAll('iframe').forEach(iframe => {
+      try {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        if (iframeDoc && iframeDoc.body) {
+          console.log('Setting up observer on iframe:', iframe);
+          setupObserver(iframeDoc.body);
+        }
+      } catch (e) {
+        console.error('Failed to access iframe:', e);
+      }
     });
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
 
     // Fallback: Log navigation on unload
     window.addEventListener('unload', () => {
@@ -167,7 +190,7 @@
     });
 
     // Fetch and display data
-    fetch('/data?page=https://shopping.naturaldos.com/calmblend-microdose-advert-lp1&platform=clickfunnels')
+    fetch('/data?page=https://shopping.naturaldos.com/advtr-hemp-softgel-news--5e333&platform=clickfunnels')
       .then(response => response.json())
       .then(data => {
         document.body.innerHTML = document.body.innerHTML.replace(/\${(.*?)}/g, (_, expr) => eval(expr));
