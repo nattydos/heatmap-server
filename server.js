@@ -18,9 +18,9 @@ db.run('CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCR
 
 app.post('/track', (req, res) => {
   const { sessionId, x, y, page, platform, type, section, duration, target } = req.body;
-  const isValidClick = type === 'click' && target && (target.includes('a') || target.includes('button'));
+  // Only insert if type is provided, defaulting to null if missing
   db.run('INSERT INTO interactions (sessionId, x, y, page, platform, type, section, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
-    [sessionId, x, y, page, platform, isValidClick ? type : (type === 'click' ? null : type), section || null, duration || null], 
+    [sessionId, x, y, page, platform, type || null, section || null, duration || null], 
     (err) => {
       if (err) {
         console.error('Insert error:', err);
@@ -43,41 +43,35 @@ app.get('/data', (req, res) => {
         return res.sendStatus(500);
       }
 
-      // Group interactions by sessionId
       const sessions = allInteractions.reduce((acc, i) => {
         if (!acc[i.sessionId]) acc[i.sessionId] = [];
         acc[i.sessionId].push(i);
         return acc;
       }, {});
 
-      // Identify clicker sessions (sessions with at least one valid click event)
-      const clickerSessions = Object.values(sessions).filter(session => session.some(i => i.type === 'click' && i.type !== null));
-      const nonClickerSessions = Object.values(sessions).filter(session => !session.some(i => i.type === 'click' && i.type !== null));
+      const clickerSessions = Object.values(sessions).filter(session => session.some(i => i.type === 'click'));
+      const nonClickerSessions = Object.values(sessions).filter(session => !session.some(i => i.type === 'click'));
 
-      // Log session classification for debugging
       Object.keys(sessions).forEach(sessionId => {
-        const hasClick = sessions[sessionId].some(i => i.type === 'click' && i.type !== null);
+        const hasClick = sessions[sessionId].some(i => i.type === 'click');
         console.log(`Session ${sessionId} classified as ${hasClick ? 'clicker' : 'non-clicker'}`);
       });
 
-      // Extract scroll events for overall, clickers, and nonClickers
       const scrollEvents = allInteractions.filter(i => i.type === 'scroll');
       const clickerScrolls = clickerSessions.flatMap(session => session.filter(i => i.type === 'scroll'));
       const nonClickerScrolls = nonClickerSessions.flatMap(session => session.filter(i => i.type === 'scroll'));
 
-      // Function to calculate average and median for a set of scroll events
       function calculateStats(events) {
         const grouped = events.reduce((acc, e) => {
           acc[e.section] = acc[e.section] || [];
           acc[e.section].push(e.duration);
           return acc;
         }, {});
-
         const stats = {};
         for (const section in grouped) {
           const durations = grouped[section].sort((a, b) => a - b);
           const n = durations.length;
-          if (n === 0) continue; // Skip empty sections
+          if (n === 0) continue;
           const median = n % 2 === 1 ? durations[Math.floor(n / 2)] : (durations[n / 2 - 1] + durations[n / 2]) / 2;
           const avg = durations.reduce((sum, d) => sum + d, 0) / n;
           stats[section] = { avg, median };
@@ -85,12 +79,10 @@ app.get('/data', (req, res) => {
         return stats;
       }
 
-      // Calculate stats for all categories
       const overallStats = calculateStats(scrollEvents);
       const nonClickerStats = calculateStats(nonClickerScrolls);
       const clickerStats = calculateStats(clickerScrolls);
 
-      // Send response
       res.json({
         overall: overallStats,
         nonClickers: nonClickerStats,
