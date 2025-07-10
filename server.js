@@ -18,7 +18,6 @@ db.run('CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCR
 
 app.post('/track', (req, res) => {
   const { sessionId, x, y, page, platform, type, section, duration, target } = req.body;
-  // Insert with type as provided, defaulting to null if missing
   db.run('INSERT INTO interactions (sessionId, x, y, page, platform, type, section, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
     [sessionId, x, y, page, platform, type || null, section || null, duration || null], 
     (err) => {
@@ -49,8 +48,10 @@ app.get('/data', (req, res) => {
         return acc;
       }, {});
 
-      const clickerSessions = Object.values(sessions).filter(session => session.some(i => i.type === 'click'));
-      const nonClickerSessions = Object.values(sessions).filter(session => !session.some(i => i.type === 'click'));
+      const totalSessions = Object.keys(sessions).length;
+      const clickerSessions = Object.values(sessions).filter(session => session.some(i => i.type === 'click')).length;
+      const nonClickerSessions = totalSessions - clickerSessions;
+      const totalClicks = allInteractions.filter(i => i.type === 'click').length;
 
       Object.keys(sessions).forEach(sessionId => {
         const hasClick = sessions[sessionId].some(i => i.type === 'click');
@@ -58,8 +59,8 @@ app.get('/data', (req, res) => {
       });
 
       const scrollEvents = allInteractions.filter(i => i.type === 'scroll');
-      const clickerScrolls = clickerSessions.flatMap(session => session.filter(i => i.type === 'scroll'));
-      const nonClickerScrolls = nonClickerSessions.flatMap(session => session.filter(i => i.type === 'scroll'));
+      const clickerScrolls = Object.values(sessions).filter(session => session.some(i => i.type === 'click')).flatMap(session => session.filter(i => i.type === 'scroll'));
+      const nonClickerScrolls = Object.values(sessions).filter(session => !session.some(i => i.type === 'click')).flatMap(session => session.filter(i => i.type === 'scroll'));
 
       function calculateStats(events) {
         const grouped = events.reduce((acc, e) => {
@@ -84,6 +85,9 @@ app.get('/data', (req, res) => {
       const clickerStats = calculateStats(clickerScrolls);
 
       res.json({
+        totalSessions,
+        clickerSessions,
+        totalClicks,
         overall: overallStats,
         nonClickers: nonClickerStats,
         clickers: clickerStats
