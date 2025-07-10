@@ -1,6 +1,7 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
+const fs = require('fs');
 const app = express();
 
 app.use(cors());
@@ -102,6 +103,23 @@ app.get('/debug', (req, res) => {
       return res.sendStatus(500);
     }
     res.json(rows);
+  });
+});
+
+// Add backup endpoint
+app.get('/backup', (req, res) => {
+  const dbPath = 'heatmap.db';
+  fs.access(dbPath, fs.constants.F_OK, (err) => {
+    if (err) {
+      console.error('Database file not found:', err);
+      return res.status(404).send('Database file not found');
+    }
+    res.download(dbPath, 'heatmap_backup.db', (err) => {
+      if (err) {
+        console.error('Error sending backup:', err);
+        res.status(500).send('Error generating backup');
+      }
+    });
   });
 });
 
