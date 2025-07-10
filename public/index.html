@@ -54,6 +54,7 @@
   <script>
     // Track clicks and scrolls
     let lastScrollTime = null;
+    let lastClickPosition = { x: 0, y: 0 };
     function getCurrentSection() {
       const sections = document.querySelectorAll('section');
       for (let section of sections) {
@@ -95,6 +96,7 @@
           element.addEventListener('click', (e) => {
             console.log('Link click detected! Target:', e.target, 'Tag:', e.target.tagName, 'Phase:', e.eventPhase);
             let target = e.target.tagName.toLowerCase();
+            lastClickPosition = { x: e.clientX, y: e.clientY };
             const clickData = {
               sessionId: sessionId,
               x: e.clientX,
@@ -107,24 +109,28 @@
               target: target
             };
             clickQueue.push(clickData);
+            // Delay navigation to ensure logging
+            setTimeout(() => {
+              if (e.target.href) window.location = e.target.href; // Mimic original navigation
+            }, 100); // 100ms delay
+            e.preventDefault(); // Prevent immediate navigation
           }, { capture: true, once: true });
           element.dataset.tracked = 'true';
         }
       });
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
 
     // Fallback: Log navigation on unload
     window.addEventListener('unload', () => {
       console.log('Page unloading, sending queued clicks');
       sendQueuedClicks();
       // Fallback: Log a click if no prior clicks and navigation occurred
-      if (clickQueue.length === 0 && performance.navigation.type === 1) { // TYPE_RELOAD = 1, but we infer navigation
-        const lastClick = { x: window.innerWidth / 2, y: window.innerHeight / 2 }; // Approximate
+      if (clickQueue.length === 0) {
         const clickData = {
           sessionId: sessionId,
-          x: lastClick.x,
-          y: lastClick.y,
+          x: lastClickPosition.x || window.innerWidth / 2,
+          y: lastClickPosition.y || window.innerHeight / 2,
           page: window.location.href,
           platform: 'clickfunnels',
           type: 'click',
