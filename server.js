@@ -19,28 +19,47 @@ db.run('CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCR
 
 app.post('/track', (req, res) => {
   const { sessionId, x, y, page, platform, type, section, duration, target } = req.body;
+  // Normalize page for consistency
+  const normalizedPage = page ? page.trim().toLowerCase() : page;
   db.run('INSERT INTO interactions (sessionId, x, y, page, platform, type, section, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
-    [sessionId, x, y, page, platform, type || null, section || null, duration || null], 
+    [sessionId, x, y, normalizedPage, platform, type || null, section || null, duration || null], 
     (err) => {
       if (err) {
         console.error('Insert error:', err);
         return res.sendStatus(500);
       }
-      console.log('Data inserted:', { sessionId, x, y, page, platform, type, section, duration, target });
+      console.log('Data inserted:', { sessionId, x, y, page: normalizedPage, platform, type, section, duration, target });
       res.sendStatus(200);
     });
 });
 
 app.get('/data', (req, res) => {
+  res.set('Cache-Control', 'no-store'); // Prevent caching
   const { page, platform } = req.query;
   if (!page || !platform) return res.status(400).json({ error: 'Page and platform are required' });
 
-  db.all('SELECT * FROM interactions WHERE page = ? AND platform = ? AND ((type = "scroll" AND duration > 0) OR type = "click")', 
-    [page, platform], 
+  // Normalize the query page for consistency
+  const normalizedPage = page.trim().toLowerCase();
+  console.log('→ /data called with:', req.query); // Debug log
+
+  db.all('SELECT * FROM interactions WHERE LOWER(page) = ? AND platform = ? AND ((type = "scroll" AND duration > 0) OR type = "click")', 
+    [normalizedPage, platform], 
     (err, allInteractions) => {
       if (err) {
         console.error('Database query error:', err);
         return res.sendStatus(500);
+      }
+
+      if (allInteractions.length === 0) {
+        console.log('No data found for page:', normalizedPage);
+        return res.json({
+          totalSessions: 0,
+          clickerSessions: 0,
+          totalClicks: 0,
+          overall: {},
+          nonClickers: {},
+          clickers: {}
+        });
       }
 
       const sessions = allInteractions.reduce((acc, i) => {
