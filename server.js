@@ -18,7 +18,7 @@ db.run('CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCR
 
 app.post('/track', (req, res) => {
   const { sessionId, x, y, page, platform, type, section, duration, target } = req.body;
-  // Only insert if type is provided, defaulting to null if missing
+  // Insert with type as provided, defaulting to null if missing
   db.run('INSERT INTO interactions (sessionId, x, y, page, platform, type, section, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
     [sessionId, x, y, page, platform, type || null, section || null, duration || null], 
     (err) => {
