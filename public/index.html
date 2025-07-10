@@ -66,7 +66,7 @@
       <td id="clickers-unknown-med">0.00</td>
     </tr>
   </table>
-  <div id="error-message" style="color: red; display: none;">Error loading data. Please check server or network.</div>
+  <div id="error-message" style="color: red; display: none;">Error loading data. Please check server or network, or no data exists for this page.</div>
   <script>
     // Initialize lastScrollTime to ensure positive duration for first scroll
     let lastScrollTime = Date.now();
@@ -228,11 +228,13 @@
 
     // Fetch and display data with form handling
     const form = document.getElementById('config-form');
+    const pageInput = document.getElementById('page');
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const page = document.getElementById('page').value;
+      const page = pageInput.value.trim();
       const platform = document.getElementById('platform').value;
-      fetch(`/data?page=${encodeURIComponent(page)}&platform=${encodeURIComponent(platform)}`)
+      console.log('→ Fetching data for page:', page, 'platform:', platform); // Debug log
+      fetch(`/data?page=${encodeURIComponent(page)}&platform=${encodeURIComponent(platform)}`, { cache: 'no-cache' })
         .then(response => {
           if (!response.ok) throw new Error('Network response was not ok');
           return response.json();
@@ -266,9 +268,11 @@
           table.querySelector('#nonclickers-unknown-med').textContent = (data.nonClickers.unknown?.median || 0).toFixed(2);
           table.querySelector('#clickers-unknown-avg').textContent = (data.clickers.unknown?.avg || 0).toFixed(2);
           table.querySelector('#clickers-unknown-med').textContent = (data.clickers.unknown?.median || 0).toFixed(2);
+          document.getElementById('error-message').style.display = 'none';
         })
         .catch(error => {
           console.error('Fetch error:', error);
+          document.getElementById('error-message').textContent = `Error loading data. Please check server or network, or no data exists for ${page}.`;
           document.getElementById('error-message').style.display = 'block';
         });
     });
