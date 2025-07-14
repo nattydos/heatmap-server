@@ -17,10 +17,22 @@ db.run('CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCR
   if (err) console.error('Table creation error:', err);
 });
 
+// Function to normalize URL
+function normalizeUrl(url) {
+  if (!url) return null;
+  // Remove protocol, www., trailing slash, and query parameters
+  return url
+    .replace(/^(https?:\/\/)?/i, '')  // Remove protocol
+    .replace(/^www\./i, '')  // Remove www.
+    .replace(/\?.*$/, '')  // Remove query parameters
+    .replace(/\/$/, '')  // Remove trailing slash
+    .trim()
+    .toLowerCase();
+}
+
 app.post('/track', (req, res) => {
   const { sessionId, x, y, page, platform, type, section, duration, target } = req.body;
-  // Normalize page for consistency
-  const normalizedPage = page ? page.trim().toLowerCase() : page;
+  const normalizedPage = normalizeUrl(page);
   db.run('INSERT INTO interactions (sessionId, x, y, page, platform, type, section, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
     [sessionId, x, y, normalizedPage, platform, type || null, section || null, duration || null], 
     (err) => {
@@ -38,11 +50,10 @@ app.get('/data', (req, res) => {
   const { page, platform } = req.query;
   if (!page || !platform) return res.status(400).json({ error: 'Page and platform are required' });
 
-  // Normalize the query page for consistency
-  const normalizedPage = page.trim().toLowerCase();
+  const normalizedPage = normalizeUrl(page);
   console.log('→ /data called with:', req.query); // Debug log
 
-  db.all('SELECT * FROM interactions WHERE LOWER(page) = ? AND platform = ? AND ((type = "scroll" AND duration > 0) OR type = "click")', 
+  db.all('SELECT * FROM interactions WHERE page = ? AND platform = ? AND ((type = "scroll" AND duration > 0) OR type = "click")', 
     [normalizedPage, platform], 
     (err, allInteractions) => {
       if (err) {
@@ -70,7 +81,6 @@ app.get('/data', (req, res) => {
 
       const totalSessions = Object.keys(sessions).length;
       const clickerSessions = Object.values(sessions).filter(session => session.some(i => i.type === 'click')).length;
-      const nonClickerSessions = totalSessions - clickerSessions;
       const totalClicks = allInteractions.filter(i => i.type === 'click').length;
 
       Object.keys(sessions).forEach(sessionId => {
