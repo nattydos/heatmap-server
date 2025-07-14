@@ -53,7 +53,7 @@ app.get('/data', (req, res) => {
   const normalizedPage = normalizeUrl(page);
   console.log('→ /data called with:', req.query); // Debug log
 
-  db.all('SELECT * FROM interactions WHERE page = ? AND platform = ? AND ((type = "scroll" AND duration > 0) OR type = "click")', 
+  db.all('SELECT * FROM interactions WHERE page = ? AND platform = ? AND (type = "scroll" OR type = "click")', 
     [normalizedPage, platform], 
     (err, allInteractions) => {
       if (err) {
