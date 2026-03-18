@@ -24,7 +24,6 @@ function normalizeUrl(url) {
   return url
     .replace(/^(https?:\/\/)?/i, '')  // Remove protocol
     .replace(/^www\./i, '')  // Remove www.
-    .replace(/\?.*$/, '')  // Remove query parameters
     .replace(/\/$/, '')  // Remove trailing slash
     .trim()
     .toLowerCase();
