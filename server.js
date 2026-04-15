@@ -13,9 +13,12 @@ const db = new sqlite3.Database('heatmap.db', (err) => {
 });
 
 // Ensure the interactions table includes sessionId
-db.run('CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCREMENT, sessionId TEXT, x INTEGER, y INTEGER, page TEXT, platform TEXT, type TEXT, section TEXT, duration REAL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)', (err) => {
+db.run('CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCREMENT, sessionId TEXT, x INTEGER, y INTEGER, page TEXT, platform TEXT, type TEXT, section TEXT, duration REAL, target TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)', (err) => {
   if (err) console.error('Table creation error:', err);
 });
+
+// One-time migration: add target column if it doesn't already exist (silent no-op after first run)
+db.run('ALTER TABLE interactions ADD COLUMN target TEXT', () => {});
 
 // Function to normalize URL
 function normalizeUrl(url) {
@@ -32,8 +35,8 @@ function normalizeUrl(url) {
 app.post('/track', (req, res) => {
   const { sessionId, x, y, page, platform, type, section, duration, target } = req.body;
   const normalizedPage = normalizeUrl(page);
-  db.run('INSERT INTO interactions (sessionId, x, y, page, platform, type, section, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
-    [sessionId, x, y, normalizedPage, platform, type || null, section || null, duration || null], 
+  db.run('INSERT INTO interactions (sessionId, x, y, page, platform, type, section, duration, target) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+  [sessionId, x, y, normalizedPage, platform, type || null, section || null, duration || null, target || null], 
     (err) => {
       if (err) {
         console.error('Insert error:', err);
