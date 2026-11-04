@@ -1,11 +1,53 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
+const crypto = require('crypto');
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const app = express();
+
+// The SQLite file lives on App Platform's ephemeral disk. A process exit
+// restarts the app and comes back with an empty database, so a single bad
+// request must not be allowed to take the process down. Startup failures
+// (for example, the listen port is already taken) still exit.
+let serverListening = false;
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+  if (!serverListening) process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+  if (!serverListening) process.exit(1);
+});
 
 app.use(cors());
 app.use(express.json());
+
+// Client aborts surface as 'error' events on the request, response, or socket.
+// An 'error' event with no listener crashes the process. Keep-alive sockets are
+// reused across requests, so the socket listener is attached once.
+const guardedStreams = new WeakSet();
+
+function logStreamError(err) {
+  console.error('Stream error:', err && (err.code || err.message) || err);
+}
+
+function guardStream(stream) {
+  if (!stream || guardedStreams.has(stream)) return;
+  guardedStreams.add(stream);
+  stream.on('error', logStreamError);
+}
+
+app.use((req, res, next) => {
+  guardStream(req);
+  guardStream(res);
+  guardStream(req.socket);
+  next();
+});
+
 app.use(express.static('public'));
 
 const db = new sqlite3.Database('heatmap.db', (err) => {
@@ -30,6 +72,110 @@ function normalizeUrl(url) {
     .replace(/\/$/, '')  // Remove trailing slash
     .trim()
     .toLowerCase();
+}
+
+// Optional gate for admin-only routes. When HEATMAP_ADMIN_TOKEN is unset (or
+// empty), these routes stay open so the existing desktop backup script keeps
+// working. When it is set, require Authorization: Bearer <token> or ?token=.
+function tokenEquals(provided, expected) {
+  if (typeof provided !== 'string') return false;
+  const actual = Buffer.from(provided);
+  const want = Buffer.from(expected);
+  if (actual.length !== want.length) return false;
+  return crypto.timingSafeEqual(actual, want);
+}
+
+function adminAuthorized(req) {
+  const expected = process.env.HEATMAP_ADMIN_TOKEN;
+  if (!expected) return true;
+
+  const header = req.headers.authorization;
+  if (typeof header === 'string') {
+    const match = /^Bearer\s+(.+)$/i.exec(header);
+    if (match && tokenEquals(match[1], expected)) return true;
+  }
+  if (tokenEquals(req.query.token, expected)) return true;
+  return false;
+}
+
+function requireAdmin(req, res, next) {
+  if (adminAuthorized(req)) return next();
+  res.sendStatus(401);
+}
+
+function isSqliteBusy(err) {
+  if (!err) return false;
+  return err.code === 'SQLITE_BUSY' || err.code === 'SQLITE_LOCKED' ||
+    err.errno === sqlite3.BUSY || err.errno === sqlite3.LOCKED;
+}
+
+function isClientAbort(err) {
+  if (!err) return false;
+  return err.code === 'ECONNABORTED' || err.code === 'ECONNRESET' ||
+    err.code === 'EPIPE' || err.code === 'ERR_STREAM_PREMATURE_CLOSE';
+}
+
+// Copy the live database with the SQLite online backup API so a download
+// never streams a file that SQLite is in the middle of writing.
+function snapshotDatabase(destPath) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      reject(err instanceof Error ? err : new Error(String(err)));
+    };
+    const succeed = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+
+    let backup;
+    const copyAll = (attemptsLeft) => {
+      // -1 copies every remaining page. BUSY/LOCKED are retried so an
+      // in-flight insert does not fail the download.
+      backup.step(-1, (stepErr) => {
+        if (isSqliteBusy(stepErr) && attemptsLeft > 0) {
+          setTimeout(() => copyAll(attemptsLeft - 1), 25);
+          return;
+        }
+        backup.finish(() => {
+          if (stepErr) fail(stepErr);
+          else succeed();
+        });
+      });
+    };
+
+    try {
+      backup = db.backup(destPath, (initErr) => {
+        if (initErr) return fail(initErr);
+        copyAll(20);
+      });
+    } catch (err) {
+      fail(err);
+      return;
+    }
+    // Init/step failures with a callback are delivered there. This listener
+    // covers any 'error' event the binding still emits, which would otherwise
+    // crash the process.
+    backup.on('error', fail);
+  });
+}
+
+function removeSnapshot(destPath) {
+  for (const suffix of ['', '-journal', '-wal', '-shm']) {
+    fs.unlink(destPath + suffix, () => {});
+  }
+}
+
+function sendBackupError(res, err) {
+  console.error('Error generating backup:', err);
+  try {
+    if (!res.headersSent) res.status(500).send('Error generating backup');
+  } catch (sendErr) {
+    console.error('Backup error response failed:', sendErr);
+  }
 }
 
 app.post('/track', (req, res) => {
@@ -127,7 +273,7 @@ app.get('/data', (req, res) => {
     });
 });
 
-app.get('/debug', (req, res) => {
+app.get('/debug', requireAdmin, (req, res) => {
   db.all('SELECT * FROM interactions', (err, rows) => {
     if (err) {
       console.error('Debug query error:', err);
@@ -137,21 +283,49 @@ app.get('/debug', (req, res) => {
   });
 });
 
-// Add backup endpoint
-app.get('/backup', (req, res) => {
-  const dbPath = 'heatmap.db';
-  fs.access(dbPath, fs.constants.F_OK, (err) => {
-    if (err) {
-      console.error('Database file not found:', err);
-      return res.status(404).send('Database file not found');
+// Consistent snapshot, then send that file. The download callback used to
+// call res.status(500).send() for every error, including a client that hung
+// up after streaming had started. That throw (ERR_HTTP_HEADERS_SENT) was
+// uncaught and killed the process.
+app.get('/backup', requireAdmin, (req, res) => {
+  const dest = path.join(
+    os.tmpdir(),
+    `heatmap-backup-${process.pid}-${Date.now()}-${crypto.randomBytes(6).toString('hex')}.db`
+  );
+
+  snapshotDatabase(dest).then(() => {
+    try {
+      res.download(dest, 'heatmap_backup.db', (err) => {
+        try {
+          removeSnapshot(dest);
+          if (!err) return;
+          if (isClientAbort(err)) {
+            console.error('Backup download aborted:', err.code);
+            return;
+          }
+          console.error('Error sending backup:', err);
+          if (!res.headersSent) res.status(500).send('Error generating backup');
+        } catch (callbackErr) {
+          console.error('Backup callback error:', callbackErr);
+        }
+      });
+    } catch (err) {
+      removeSnapshot(dest);
+      sendBackupError(res, err);
     }
-    res.download(dbPath, 'heatmap_backup.db', (err) => {
-      if (err) {
-        console.error('Error sending backup:', err);
-        res.status(500).send('Error generating backup');
-      }
-    });
+  }).catch((err) => {
+    removeSnapshot(dest);
+    sendBackupError(res, err);
   });
 });
 
-app.listen(process.env.PORT || 8080, () => console.log('Server running on port', process.env.PORT || 8080));
+const port = process.env.PORT || 8080;
+const server = app.listen(port, () => {
+  serverListening = true;
+  console.log('Server running on port', port);
+});
+
+server.on('error', (err) => {
+  console.error('Server error:', err);
+  if (!serverListening) process.exit(1);
+});
